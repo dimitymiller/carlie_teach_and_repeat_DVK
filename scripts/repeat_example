@@ -14,8 +14,6 @@ from tf.transformations import quaternion_from_euler
 import teach_repeat.transform_tools as transform_tools
 from teach_repeat.teach_repeat_common import *
 
-import matplotlib.pyplot as plt
-
 ### IMPORT MESSAGE TYPES ###
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Pose
@@ -124,7 +122,6 @@ class RepeatNode():
         if self.VISUALISATION_ON:
             cv.namedWindow('Repeat Image', cv.WINDOW_NORMAL)
             cv.namedWindow('Matched Teach Image', cv.WINDOW_NORMAL)
-            plt.ion()
 
         # ROS SPIN
         while not rospy.is_shutdown():
@@ -142,10 +139,7 @@ class RepeatNode():
                 distance = np.linalg.norm(imCenter-scaled_patch_location[::-1])
                 self.distFromCenter += [distance]
 
-                plt.plot(self.bestScore)
-                plt.pause(0.1)
                 # Draw comparison patch on current image and location on teach image
-                print(teach_img.shape)
                 DrawCropPatchOnImage(self.current_image, self.PATCH_PORTION, self.Y_PATCH, center = np.asarray([scaled_cPos, teach_img.shape[0]//2]))
                 DrawCropPatchOnImage(teach_img, self.PATCH_PORTION, self.Y_PATCH, scaled_patch_location)
 
@@ -155,11 +149,10 @@ class RepeatNode():
                 cv.waitKey(1)
                 self.update_visualisation = False
 
-                rospy.loginfo('Mean score: {}'.format(np.mean(self.bestScore)))
-                rospy.loginfo('Min score: {}'.format(np.min(self.bestScore)))
-                rospy.loginfo('STD score: {}'.format(np.std(self.bestScore)))
+                # rospy.loginfo('Mean score: {}'.format(np.mean(self.bestScore)))
+                # rospy.loginfo('Min score: {}'.format(np.min(self.bestScore)))
+                # rospy.loginfo('STD score: {}'.format(np.std(self.bestScore)))
         #         rospy.loginfo()
-        # plt.show(block = True)
 
     # ODOM CALLBACK
     def Odom_Callback(self, data):
@@ -312,7 +305,6 @@ class RepeatNode():
         # yaw-offset will be positive if car has rotated to the left
         # Max location is top_left want center (max location is x,y not y,x like image coordinates)
         self.patch_center_location = np.array([max_location[0], max_location[1]]) + np.array([img_proc_patch.shape[1]/2.0, img_proc_patch.shape[0]/2.0])
-        print(best_cPos, self.patch_center_location[0])
         
         # y-offset will be positive if car is to the left of the teach frame (i.e. the repeat patch was found on the right hand side of the teach image)
         # y_offset = img_proc.shape[1]//2 - self.patch_center_location[0]
