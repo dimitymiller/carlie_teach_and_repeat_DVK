@@ -28,6 +28,12 @@ The core of our approach is based on normalised cross-correlation (NCC). We comp
     - keep track of the current best teach match (maximum score).
 5. The matched teach frame is the one with the maximum score. Now find the match within this image relative to only the center cropped template. This allows for a smoother control signal, once we have already found the correct frame with our ensemble template method.
 
+
+<figure float="center" style="margin-bottom: 2em; display: block; text-align: center">
+    <img src="figures/carlie.png" width="70%">
+    <caption><br>Ensemble of three cropped repeat frames.</caption>
+</figure>
+
 The preprocessing steps are done on lines 209 to 213. The comparison is performed within a for loop, lines 220 to 233. The image is converted to grayscale, then normalized to a range of 0-255, then resized to 64x48.
 
 ## Estimating Current Pose of Carlie
