@@ -67,7 +67,6 @@ class TeachNode():
         self.joy_subscriber = rospy.Subscriber("joy", Joy, self.JoyData_Callback)
         self.odom_subscriber = rospy.Subscriber('odom', Odometry, self.Odom_Callback)
         self.image_subscriber = rospy.Subscriber('image_raw', Image, self.Image_Callback)
-        self.depth_subscriber = rospy.Subscriber('rgbd_camera/depth/image_rect_raw', Image, self.Depth_Callback)
 
         # CREATE OPENCV WINDOWS
         if self.VISUALISATION_ON:

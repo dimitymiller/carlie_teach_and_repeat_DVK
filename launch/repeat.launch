@@ -18,7 +18,7 @@
         <param name="frame_search_window" value="3" type="int"/>
         <param name="image_comparison_size_x" value="64" type="int"/>
         <param name="image_comparison_size_y" value="48" type="int"/>
-        <param name="patch_portion" value="0.6" type="double"/> 
+        <param name="patch_portion" value="0.5" type="double"/> 
 
         <!-- controller arguments -->
         <param name="target_frame_lookahead" value="2" type="int"/> 
