@@ -9,7 +9,8 @@ Below is an example of the documentation we are looking for as part of your subm
 The teach and repeat phase image preprocessing steps are:
 
 1. Convert to grayscale
-2. Resolution reduction to 64x48 
+2. Normalize between 0 and 255.
+3. Resolution reduction to 64x48 
 
 <figure float="center" style="margin-bottom: 2em; display: block; text-align: center">
     <img src="figures/frame_000000.png" width="35%">
