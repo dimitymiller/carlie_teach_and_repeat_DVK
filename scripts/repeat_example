@@ -14,6 +14,8 @@ from tf.transformations import quaternion_from_euler
 import teach_repeat.transform_tools as transform_tools
 from teach_repeat.teach_repeat_common import *
 
+import matplotlib.pyplot as plt
+
 ### IMPORT MESSAGE TYPES ###
 from sensor_msgs.msg import Image
 from geometry_msgs.msg import Pose
@@ -57,7 +59,7 @@ class RepeatNode():
         self.FRAME_SEARCH_WINDOW = rospy.get_param('~frame_search_window', 3)
         self.IMAGE_COMPARISON_SIZE = (rospy.get_param('~image_comparison_size_x', 64), rospy.get_param('~image_comparison_size_y', 48))
         self.PATCH_PORTION = rospy.get_param('~patch_portion', 0.6)
-        
+        self.Y_PATCH = 1#self.PATCH_PORTION
         # controller constants
         self.TARGET_FRAME_LOOKAHEAD = max(rospy.get_param('~target_frame_lookahead', 2), 1) # minimum is 1
         self.RHO_GAIN = rospy.get_param('~rho_gain', 0.6)
@@ -113,10 +115,15 @@ class RepeatNode():
         self.ackermann_cmd.drive.acceleration = rospy.get_param('acceleration', 0.5) # see AckermannDriveStamped message for definition
         self.ackermann_cmd.drive.jerk = 0 # see AckermannDriveStamped message for definition
 
+        #create an array for distance to center
+        self.distFromCenter = []
+        self.bestScore = []
+        self.bestCPos = 320
         # CREATE OPENCV WINDOWS
         if self.VISUALISATION_ON:
             cv.namedWindow('Repeat Image', cv.WINDOW_NORMAL)
             cv.namedWindow('Matched Teach Image', cv.WINDOW_NORMAL)
+            plt.ion()
 
         # ROS SPIN
         while not rospy.is_shutdown():
@@ -128,16 +135,30 @@ class RepeatNode():
 
                 # Determine approximate patch location due to different scales
                 scaled_patch_location = self.patch_center_location * (teach_img.shape[1] / self.IMAGE_COMPARISON_SIZE[0])
+                scaled_cPos = self.bestCPos * (teach_img.shape[1] / self.IMAGE_COMPARISON_SIZE[0])
+                imCenter = np.asarray([teach_img.shape[0]/2, teach_img.shape[1]/2])
 
+                distance = np.linalg.norm(imCenter-scaled_patch_location[::-1])
+                self.distFromCenter += [distance]
+
+                plt.plot(self.bestScore)
+                plt.pause(0.1)
                 # Draw comparison patch on current image and location on teach image
-                DrawCropPatchOnImage(self.current_image, self.PATCH_PORTION)
-                DrawCropPatchOnImage(teach_img, self.PATCH_PORTION, scaled_patch_location)
+                print(teach_img.shape)
+                DrawCropPatchOnImage(self.current_image, self.PATCH_PORTION, self.Y_PATCH, center = np.asarray([scaled_cPos, teach_img.shape[0]//2]))
+                DrawCropPatchOnImage(teach_img, self.PATCH_PORTION, self.Y_PATCH, scaled_patch_location)
 
                 # Show annotated images
                 cv.imshow('Repeat Image', self.current_image)
                 cv.imshow('Matched Teach Image', teach_img)
                 cv.waitKey(1)
                 self.update_visualisation = False
+
+                rospy.loginfo('Mean score: {}'.format(np.mean(self.bestScore)))
+                rospy.loginfo('Min score: {}'.format(np.min(self.bestScore)))
+                rospy.loginfo('STD score: {}'.format(np.std(self.bestScore)))
+        #         rospy.loginfo()
+        # plt.show(block = True)
 
     # ODOM CALLBACK
     def Odom_Callback(self, data):
@@ -186,7 +207,9 @@ class RepeatNode():
                 rospy.logwarn("Was unable to save repeat image (ID = %d)"%(self.frame_id) + ". Error: " + str(e))
 
         # Image Matching
-        self.current_matched_teach_frame_id, lateral_offset = self.ImageMatching(img_bgr, relative_odom_trans)
+        self.current_matched_teach_frame_id, lateral_offset, score, cPos = self.ImageMatching(img_bgr, relative_odom_trans)
+        self.bestScore += [score]
+        self.bestCPos = cPos
         self.update_visualisation = True
 
         # Controller
@@ -203,34 +226,68 @@ class RepeatNode():
         best_score = None
         best_max_location = None
         best_match_frame_id = None
+        best_cPos = None
 
         # STEP 1 - PREPROCESS IMAGE IF REQUIRED
         # Preprocess repeat image
         img_proc = cv.cvtColor(img_bgr, cv.COLOR_BGR2GRAY)
+        img_outEmpty = np.zeros(img_proc.shape)
+        img_proc = cv.normalize(img_proc, img_outEmpty, 0, 255, cv.NORM_MINMAX)
         img_proc = cv.resize(img_proc, self.IMAGE_COMPARISON_SIZE)
 
-        # Take center patch of repeat image
-        img_proc_patch = ImageCropCenter(img_proc, self.PATCH_PORTION)
+        w = img_proc.shape[1]
+        cPoses = [int(self.PATCH_PORTION*0.5*w), int(0.5*w), int(w-(self.PATCH_PORTION*0.5*w))]
+        # cPoses = [int(0.5*w)]
 
-        # STEP 2 - FIND BEST MATCH IN TEACH SET (here only searching in a local window, not a global search)
-        # Loop through teach dataset within given search radius
-        start_idx = int(max(self.current_matched_teach_frame_id-self.FRAME_SEARCH_WINDOW, 0))
-        end_idx = int(min(self.current_matched_teach_frame_id+self.FRAME_SEARCH_WINDOW+1, self.teach_dataset.shape[0]))
-        # rospy.loginfo('Start: %d, End: %d'%(start_idx, end_idx))
-        for teach_frame_id in self.teach_dataset[start_idx:end_idx, 0]:
-            # Read in teach processed img
-            teach_img = cv.imread(os.path.join(self.teach_dataset_processed_path, 'frame_%06d.png'%(teach_frame_id)), cv.IMREAD_GRAYSCALE)
+        for cPos in cPoses:
+            # Take center patch of repeat image
+            img_proc_patch = ImageCrop(img_proc, cPos, self.PATCH_PORTION, self.Y_PATCH)
 
-            # Compare using normalised cross correlation (OpenCV Template Matching Function)
-            result = cv.matchTemplate(teach_img, img_proc_patch, cv.TM_CCOEFF_NORMED)
+            # STEP 2 - FIND BEST MATCH IN TEACH SET (here only searching in a local window, not a global search)
+            # Loop through teach dataset within given search radius
+            start_idx = int(max(self.current_matched_teach_frame_id-self.FRAME_SEARCH_WINDOW, 0))
+            end_idx = int(min(self.current_matched_teach_frame_id+self.FRAME_SEARCH_WINDOW+1, self.teach_dataset.shape[0]))
+            # rospy.loginfo('Start: %d, End: %d'%(start_idx, end_idx))
+            for teach_frame_id in self.teach_dataset[start_idx:end_idx, 0]:
+                # Read in teach processed img
+                teach_img = cv.imread(os.path.join(self.teach_dataset_processed_path, 'frame_%06d.png'%(teach_frame_id)), cv.IMREAD_GRAYSCALE)
+               
+                # Compare using normalised cross correlation (OpenCV Template Matching Function)
+                result = cv.matchTemplate(teach_img, img_proc_patch, cv.TM_CCOEFF_NORMED)
 
-            # Get maximum value and its location
-            min_val, max_val, min_location, max_location = cv.minMaxLoc(result)
+                # Get maximum value and its location
+                min_val, max_val, min_location, max_location = cv.minMaxLoc(result)
 
-            if best_score == None or best_score < max_val:
-                best_score = max_val
-                best_max_location = max_location
-                best_match_frame_id = int(teach_frame_id)
+                if best_score == None or best_score < max_val:
+                    best_score = max_val
+                    best_max_location = max_location
+                    best_match_frame_id = int(teach_frame_id)
+                    best_cPos = cPos
+
+        ###ORIGINAL
+        # # Take center patch of repeat image
+        # img_proc_patch = ImageCropCenter(img_proc, self.PATCH_PORTION, self.Y_PATCH)
+        # img_proc_patch = ImageCropCenter(img_proc, self.PATCH_PORTION, self.Y_PATCH)
+
+        # # STEP 2 - FIND BEST MATCH IN TEACH SET (here only searching in a local window, not a global search)
+        # # Loop through teach dataset within given search radius
+        # start_idx = int(max(self.current_matched_teach_frame_id-self.FRAME_SEARCH_WINDOW, 0))
+        # end_idx = int(min(self.current_matched_teach_frame_id+self.FRAME_SEARCH_WINDOW+1, self.teach_dataset.shape[0]))
+        # # rospy.loginfo('Start: %d, End: %d'%(start_idx, end_idx))
+        # for teach_frame_id in self.teach_dataset[start_idx:end_idx, 0]:
+        #     # Read in teach processed img
+        #     teach_img = cv.imread(os.path.join(self.teach_dataset_processed_path, 'frame_%06d.png'%(teach_frame_id)), cv.IMREAD_GRAYSCALE)
+           
+        #     # Compare using normalised cross correlation (OpenCV Template Matching Function)
+        #     result = cv.matchTemplate(teach_img, img_proc_patch, cv.TM_CCOEFF_NORMED)
+
+        #     # Get maximum value and its location
+        #     min_val, max_val, min_location, max_location = cv.minMaxLoc(result)
+
+        #     if best_score == None or best_score < max_val:
+        #         best_score = max_val
+        #         best_max_location = max_location
+        #         best_match_frame_id = int(teach_frame_id)
 
         # STEP 3 - FIND THE POSITION OF THE REPEAT FRAME RELATIVE TO THE BEST MATCHED TEACH FRAME
         # offsets should be measured relative to the best matched frame coordinate frame, as in
@@ -242,13 +299,14 @@ class RepeatNode():
         self.patch_center_location = np.array([max_location[0], max_location[1]]) + np.array([img_proc_patch.shape[1]/2.0, img_proc_patch.shape[0]/2.0])
         
         # y-offset will be positive if car is to the left of the teach frame (i.e. the repeat patch was found on the right hand side of the teach image)
-        y_offset = img_proc.shape[1]//2 - self.patch_center_location[0]
+        # y_offset = img_proc.shape[1]//2 - self.patch_center_location[0]
+        y_offset = best_cPos - self.patch_center_location[0]
         
         # create offsets array [x-offset, y-offset, yaw-offset] - assume x-offset and yaw-offset are zero
         offsets = np.array([self.X_OFFSET_SCALE_FACTOR*0, self.Y_OFFSET_SCALE_FACTOR*y_offset, self.YAW_OFFSET_SCALE_FACTOR*0])
 
         # return
-        return best_match_frame_id, offsets
+        return best_match_frame_id, offsets, best_score, best_cPos
 
     # CONTROLLER
     def Controller(self, match_teach_id, offsets):

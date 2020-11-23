@@ -60,7 +60,10 @@ def WriteDataToDatasetFile(img, frame_id, save_path, relative_odom_trans, relati
     return 0
 
 # Crop an image from its center based on a portion
-def ImageCropCenter(img, portion):
+def ImageCropCenter(img, x_portion, y_portion = None):
+    if y_portion == None:
+        y_portion = x_portion
+
     if len(img.shape) == 2:
         img_height, img_width = img.shape
         channels = 1
@@ -68,8 +71,8 @@ def ImageCropCenter(img, portion):
         img_height, img_width, channels = img.shape
 
     # portion is from from 0 to 1 
-    patch_width = int(min(max(round(img_width * portion), 1), img_width))
-    patch_height = int(min(max(round(img_height * portion), 1), img_height))
+    patch_width = int(min(max(round(img_width * x_portion), 1), img_width))
+    patch_height = int(min(max(round(img_height * y_portion), 1), img_height))
 
     startx = int(img_width//2-(patch_width//2))
     starty = int(img_height//2-(patch_height//2))
@@ -78,9 +81,35 @@ def ImageCropCenter(img, portion):
         return img[starty:starty+patch_height,startx:startx+patch_width]
     else:
         return img[starty:starty+patch_height,startx:startx+patch_width, :]
+
+# Crop an image from its center based on a portion
+def ImageCrop(img, xStart, x_portion, y_portion = None):
+    if y_portion == None:
+        y_portion = x_portion
+
+    if len(img.shape) == 2:
+        img_height, img_width = img.shape
+        channels = 1
+    else:
+        img_height, img_width, channels = img.shape
+
+    # portion is from from 0 to 1 
+    patch_width = int(min(max(round(img_width * x_portion), 1), img_width))
+    patch_height = int(min(max(round(img_height * y_portion), 1), img_height))
+
+    startx = int(xStart-(patch_width//2))
+    starty = int(img_height//2-(patch_height//2))
+
+    if channels == 1:
+        return img[starty:starty+patch_height,startx:startx+patch_width]
+    else:
+        return img[starty:starty+patch_height,startx:startx+patch_width, :]
         
 # Draws a rectangle on image
-def DrawCropPatchOnImage(img, portion, center=np.array([])):
+def DrawCropPatchOnImage(img, x_portion, y_portion = None, center=np.array([])):
+    if y_portion == None:
+        y_portion = x_portion
+
     if len(img.shape) == 2:
         img_height, img_width = img.shape
     else:
@@ -88,8 +117,8 @@ def DrawCropPatchOnImage(img, portion, center=np.array([])):
 
 
     # portion is from from 0 to 1 
-    patch_width = int(min(max(round(img.shape[1] * portion), 1), img_width))
-    patch_height = int(min(max(round(img.shape[0] * portion), 1), img_height))
+    patch_width = int(min(max(round(img.shape[1] * x_portion), 1), img_width))
+    patch_height = int(min(max(round(img.shape[0] * y_portion), 1), img_height))
 
     if center.size == 0:
         startx = int(img_width//2-(patch_width//2))
@@ -99,6 +128,8 @@ def DrawCropPatchOnImage(img, portion, center=np.array([])):
         cv.rectangle(img,(startx,starty),(startx+patch_width, starty+patch_height), (0,0,255), 3)
     
     else:
+        print(center)
+        print(patch_width, patch_height)
         startx = int(center[0] - (patch_width//2))
         starty = int(center[1] - (patch_height//2))
 
