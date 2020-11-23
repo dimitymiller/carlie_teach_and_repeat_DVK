@@ -22,7 +22,7 @@ The teach and repeat phase image preprocessing steps are:
 The core of our approach is based on normalised cross-correlation (NCC). We compare the preprocessed repeat image to a subset of the teach phase dataset. The subset consists of teach images within a +/- window of the previously best matched teach frame. Our algorithm is as follows:
 
 1. Preprocess repeat image
-2. We create an ensemble of 3 cropped repeat frames, which we spread horizontally over the image at 60% of the initial image width and the entire image height (see Figure below). We shall refer to these cropped portions as templates.
+2. We create an ensemble of 3 cropped repeat frames, which we spread horizontally over the image at 50% of the initial image width and the entire image height (see Figure below). We shall refer to these cropped portions as templates.
 3. If the previous template matching score was below 0.5 (bad match), the teaching frame search window is +/- 5 images. Otherwise, it is +/- 3 images. Get the teach frame subset using this window size.
 4. Compare the 3 cropped templates to each image in the teach frame subset using NCC
     - keep track of the current best teach match (maximum score).
