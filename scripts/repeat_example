@@ -276,7 +276,7 @@ class RepeatNode():
         best_cPos = int(0.5*w)
 
 
-        if best_score < 0.4:
+        if best_score < 0.5:
             self.FRAME_SEARCH_WINDOW = 5
         else:
             self.FRAME_SEARCH_WINDOW = 3
