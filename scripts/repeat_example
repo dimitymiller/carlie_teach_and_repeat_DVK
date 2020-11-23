@@ -268,8 +268,6 @@ class RepeatNode():
 
         #using best frame, find score for center position
         img_proc_patch = ImageCrop(img_proc, int(0.5*w), self.PATCH_PORTION, self.Y_PATCH)
-        start_idx = int(max(self.current_matched_teach_frame_id-self.FRAME_SEARCH_WINDOW, 0))
-        end_idx = int(min(self.current_matched_teach_frame_id+self.FRAME_SEARCH_WINDOW+1, self.teach_dataset.shape[0]))
         teach_img = cv.imread(os.path.join(self.teach_dataset_processed_path, 'frame_%06d.png'%(best_match_frame_id)), cv.IMREAD_GRAYSCALE)
         result = cv.matchTemplate(teach_img, img_proc_patch, cv.TM_CCOEFF_NORMED)
         min_val, max_val, min_location, max_location = cv.minMaxLoc(result)
@@ -277,6 +275,11 @@ class RepeatNode():
         best_max_location = max_location
         best_cPos = int(0.5*w)
 
+
+        if best_score < 0.4:
+            self.FRAME_SEARCH_WINDOW = 5
+        else:
+            self.FRAME_SEARCH_WINDOW = 3
         ###ORIGINAL
         # # Take center patch of repeat image
         # img_proc_patch = ImageCropCenter(img_proc, self.PATCH_PORTION, self.Y_PATCH)
