@@ -119,6 +119,7 @@ class RepeatNode():
         self.distFromCenter = []
         self.bestScore = []
         self.bestCPos = 320
+        self.Poses = []
         # CREATE OPENCV WINDOWS
         if self.VISUALISATION_ON:
             cv.namedWindow('Repeat Image', cv.WINDOW_NORMAL)
@@ -264,6 +265,18 @@ class RepeatNode():
                     best_match_frame_id = int(teach_frame_id)
                     best_cPos = cPos
 
+
+        #using best frame, find score for center position
+        img_proc_patch = ImageCrop(img_proc, int(0.5*w), self.PATCH_PORTION, self.Y_PATCH)
+        start_idx = int(max(self.current_matched_teach_frame_id-self.FRAME_SEARCH_WINDOW, 0))
+        end_idx = int(min(self.current_matched_teach_frame_id+self.FRAME_SEARCH_WINDOW+1, self.teach_dataset.shape[0]))
+        teach_img = cv.imread(os.path.join(self.teach_dataset_processed_path, 'frame_%06d.png'%(best_match_frame_id)), cv.IMREAD_GRAYSCALE)
+        result = cv.matchTemplate(teach_img, img_proc_patch, cv.TM_CCOEFF_NORMED)
+        min_val, max_val, min_location, max_location = cv.minMaxLoc(result)
+        best_score = max_val
+        best_max_location = max_location
+        best_cPos = int(0.5*w)
+
         ###ORIGINAL
         # # Take center patch of repeat image
         # img_proc_patch = ImageCropCenter(img_proc, self.PATCH_PORTION, self.Y_PATCH)
@@ -294,9 +307,9 @@ class RepeatNode():
         # x-offset should be positive if the car is in front of the best matched teach frame
         # y-offset should be positive if the car is to the left of the best matched teach frame
         # yaw-offset will be positive if car has rotated to the left
-
         # Max location is top_left want center (max location is x,y not y,x like image coordinates)
         self.patch_center_location = np.array([max_location[0], max_location[1]]) + np.array([img_proc_patch.shape[1]/2.0, img_proc_patch.shape[0]/2.0])
+        print(best_cPos, self.patch_center_location[0])
         
         # y-offset will be positive if car is to the left of the teach frame (i.e. the repeat patch was found on the right hand side of the teach image)
         # y_offset = img_proc.shape[1]//2 - self.patch_center_location[0]

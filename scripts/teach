@@ -67,6 +67,7 @@ class TeachNode():
         self.joy_subscriber = rospy.Subscriber("joy", Joy, self.JoyData_Callback)
         self.odom_subscriber = rospy.Subscriber('odom', Odometry, self.Odom_Callback)
         self.image_subscriber = rospy.Subscriber('image_raw', Image, self.Image_Callback)
+        self.depth_subscriber = rospy.Subscriber('rgbd_camera/depth/image_rect_raw', Image, self.Depth_Callback)
 
         # CREATE OPENCV WINDOWS
         if self.VISUALISATION_ON:
@@ -168,6 +169,55 @@ class TeachNode():
         self.frame_id += 1
         self.previous_odom = self.current_odom
         self.update_visualisation = True
+
+    # # IMAGE CALLBACK
+    # def Depth_Callback(self, data):
+    #     # Wait until recording is true, if gamepad is been used to start/stop recording
+    #     if self.USE_GAMEPAD_FOR_RECORDING_SIGNAL and self.recording != 1:
+    #         return
+
+    #     # Only start process images once odom callback has run once
+    #     if not self.odom_topic_recieved:
+    #         rospy.loginfo('Waiting until odometry data is received. Make sure topic is published and topic name is correct.')
+    #         return
+
+    #     # Set first frame and previous odom if frame_id is 0
+    #     if self.frame_id == 0:
+    #         self.previous_odom = self.current_odom
+    #         self.first_frame_odom = self.current_odom
+
+    #     # Calculate relative odom from previous frame, and 
+    #     # Calculate pose of current frame within the first image coordinate frame 
+    #     # return type is a transformation matrix (4x4 numpy array)
+    #     relative_odom_trans = CalculateTransformBetweenPoseMessages(self.current_odom, self.previous_odom)
+    #     relative_pose_trans = CalculateTransformBetweenPoseMessages(self.current_odom, self.first_frame_odom)
+    #     if relative_odom_trans.size == 0: # check to see if
+    #         rospy.logwarn('Unable to get relative odom transform. Make sure topic is published and topic name is correct.')
+    #         return # safeguard, need the relative odom for the teach
+
+    #     if self.frame_id >= 1 and transform_tools.distance_of_trans(relative_odom_trans) < self.KEYFRAME_DISTANCE_THRESHOLD:
+    #         return
+            
+    #     # Attempt to convert ROS image into CV data type (i.e. numpy array)
+    #     try:
+    #         img_bgr = self.CV_BRIDGE.imgmsg_to_cv2(data, "bgr8")
+    #         self.current_image = img_bgr.copy() # used for visualisation
+    #     except Exception as e:
+    #         rospy.logerr("Unable to convert ROS image into CV data. Error: " + str(e))
+    #         return
+
+    #     # Save data to dataset file
+    #     retval = WriteDataToDatasetFile(img_bgr, self.frame_id, self.save_path, relative_odom_trans, relative_pose_trans, self.dataset_file, {'SAVE_IMAGE_RESIZE': self.SAVE_IMAGE_RESIZE})
+    #     if retval == -1:
+    #         rospy.logwarn("Was unable to save repeat image (ID = %d)"%(self.frame_id) + ". Error: " + str(e))
+    #         return # safeguard do not want to increase frame id or previous odom
+        
+    #     rospy.loginfo('Saved teach frame (ID = %d)'%(self.frame_id))
+
+    #     # Update frame ID, previous odom and update visualisation variables
+    #     self.frame_id += 1
+    #     self.previous_odom = self.current_odom
+    #     self.update_visualisation = True
 
 
 ### MAIN ####
